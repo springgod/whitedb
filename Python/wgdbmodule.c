@@ -1436,6 +1436,7 @@ static int parse_query_params(PyObject *self, PyObject *args,
   Py_INCREF(db);  /* Make sure we don't lose database connection */
   query->db = (wg_database *) db;
 
+  
   /* Determine type of arglist */
   query->argc = 0;
   if(arglist && arglist!=Py_None) {
@@ -1464,6 +1465,7 @@ static int parse_query_params(PyObject *self, PyObject *args,
         if(!PyTuple_Check(t) || PyTuple_Size(t) != 3) {
           PyErr_SetString(PyExc_ValueError,
             "Query arglist item must be a 3-tuple.");
+          Py_DECREF(t);//sg
           return 0;
         }
 
@@ -1475,6 +1477,7 @@ static int parse_query_params(PyObject *self, PyObject *args,
         if(col==-1 && PyErr_Occurred()) {
           PyErr_SetString(PyExc_ValueError,
             "Failed to convert query argument column number.");
+          Py_DECREF(t);//sg
           return 0;
         }
 
@@ -1486,12 +1489,14 @@ static int parse_query_params(PyObject *self, PyObject *args,
         if(cond==-1 && PyErr_Occurred()) {
           PyErr_SetString(PyExc_ValueError,
             "Failed to convert query argument condition.");
+          Py_DECREF(t);//sg
           return 0;
         }
 
         enc = encode_pyobject_ext(self, query->db, PyTuple_GetItem(t, 2), 1);
         if(enc==WG_ILLEGAL) {
           /* Error set by encode function */
+          Py_DECREF(t);//sg
           return 0;
         }
 
@@ -1504,6 +1509,7 @@ static int parse_query_params(PyObject *self, PyObject *args,
                         * not setting this to len immediately, because
                         * there might be an encoding error and part of
                         * the arguments may be left uninitialized. */
+        Py_DECREF(t);//sg
       }
     }
   }
@@ -1531,8 +1537,10 @@ static int parse_query_params(PyObject *self, PyObject *args,
         memset(query->matchrec, 0, len * sizeof(wg_int));
 
         for(i=0; i<len; i++) {
-          wg_int enc = encode_pyobject_ext(self, query->db,
-            PySequence_GetItem(matchrec, i), 1);
+
+          PyObject *sg_t = PySequence_GetItem(matchrec, i); // sg
+          wg_int enc = encode_pyobject_ext(self, query->db, sg_t, 1);
+          Py_DECREF(sg_t);//sg
           if(enc==WG_ILLEGAL) {
             /* Error set by encode function */
             return 0;
@@ -1578,7 +1586,6 @@ static PyObject * wgdb_make_query(PyObject *self, PyObject *args,
     wg_query_dealloc(query);
     return NULL;
   }
-
   query->query = wg_make_query(query->db->db, query->matchrec, query->reclen,
     query->arglist, query->argc);
 
